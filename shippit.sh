@@ -1,23 +1,28 @@
 #!/bin/sh
-TIC80=/E/tic80-v1.1-win/tic80 
+BUILD=/E/tic80-v1.1-win/tic80 
 CART=wandermaze
-ITCH=wandermaze
+ITCH_USER=thegrumpygamedev
+ITCH_PROJECT=wandermaze
 
 rm -rf ./pub-linux
-rm -rf ./pub-windows
-rm -rf ./pub-mac
-rm -rf ./pub-html
 mkdir ./pub-linux
+$BUILD --cli --fs=. --cmd "load $CART.tic & export linux ./pub-linux/$CART & exit" 
+butler push pub-linux $ITCH_USER/$ITCH_PROJECT:linux
+
+rm -rf ./pub-windows
 mkdir ./pub-windows
+$BUILD --cli --fs=. --cmd "load $CART.tic & export win ./pub-windows/$CART & exit" 
+butler push pub-windows $ITCH_USER/$ITCH_PROJECT:windows
+
+rm -rf ./pub-mac
 mkdir ./pub-mac
+$BUILD --cli --fs=. --cmd "load $CART.tic & export mac ./pub-mac/$CART & exit" 
+butler push pub-mac $ITCH_USER/$ITCH_PROJECT:mac
+
+rm -rf ./pub-html
 mkdir ./pub-html
-$TIC80 --cli --fs=. --cmd "load $CART.tic & export html ./pub-html/$CART.zip & exit" 
-$TIC80 --cli --fs=. --cmd "load $CART.tic & export win ./pub-windows/$CART & exit" 
-$TIC80 --cli --fs=. --cmd "load $CART.tic & export linux ./pub-linux/$CART & exit" 
-$TIC80 --cli --fs=. --cmd "load $CART.tic & export mac ./pub-mac/$CART & exit" 
-butler push pub-html/$CART.zip thegrumpygamedev/$ITCH:html
-butler push pub-windows thegrumpygamedev/$ITCH:windows
-butler push pub-linux thegrumpygamedev/$ITCH:linux
-butler push pub-mac thegrumpygamedev/$ITCH:mac
+$BUILD --cli --fs=. --cmd "load $CART.tic & export html ./pub-html/$CART.zip & exit" 
+butler push pub-html/$CART.zip $ITCH_USER/$ITCH_PROJECT:html
+
 git add -A
 git commit -m "shipped it!"

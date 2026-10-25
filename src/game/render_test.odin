@@ -92,20 +92,13 @@ resolve_maps_palette_to_rgba_bytes :: proc(t: ^testing.T) {
 	testing.expect_value(t, bytes, [4]u8{0xb1, 0x3e, 0x53, 0xff})
 }
 
-// Not a real test: `odin test ... -define:DUMP_FRAME=path.ppm` writes a seeded frame for eyeballing.
+// Not real tests: `odin test ... -define:DUMP_FRAME=a.ppm -define:DUMP_FRAME_DEAD=b.ppm` write
+// seeded frames (a fresh game, and the same game after stepping onto its own fire) for
+// tools/make_assets.sh.
 DUMP_FRAME :: #config(DUMP_FRAME, "")
+DUMP_FRAME_DEAD :: #config(DUMP_FRAME_DEAD, "")
 
-@(test)
-dump_frame :: proc(t: ^testing.T) {
-	if DUMP_FRAME == "" {
-		return
-	}
-	f := new(Frame)
-	defer free(f)
-	g: Game
-	seed_game(&g, 1)
-	init_game(&g)
-	draw_game(f, &g)
+write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 	resolve(f)
 	out := make([dynamic]u8)
 	defer delete(out)
@@ -113,5 +106,38 @@ dump_frame :: proc(t: ^testing.T) {
 	for px in f.rgba {
 		append(&out, u8(px), u8(px >> 8), u8(px >> 16))
 	}
-	testing.expect_value(t, os.write_entire_file(DUMP_FRAME, out[:]), nil)
+	testing.expect_value(t, os.write_entire_file(path, out[:]), nil)
+}
+
+@(test)
+dump_frames :: proc(t: ^testing.T) {
+	if DUMP_FRAME == "" && DUMP_FRAME_DEAD == "" {
+		return
+	}
+	f := new(Frame)
+	defer free(f)
+	g: Game
+	seed_game(&g, 1)
+	init_game(&g)
+	if DUMP_FRAME != "" {
+		draw_game(f, &g)
+		write_ppm(t, DUMP_FRAME, f)
+	}
+	if DUMP_FRAME_DEAD != "" {
+		// Step onto a free neighbour and straight back: the cell just left is fire.
+		for dir in ([?][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+			before := g.column
+			before_row := g.row
+			move_dude(&g, dir.x, dir.y)
+			if g.column != before || g.row != before_row {
+				if g.alive {
+					move_dude(&g, -dir.x, -dir.y)
+				}
+				break
+			}
+		}
+		testing.expect(t, !g.alive)
+		draw_game(f, &g)
+		write_ppm(t, DUMP_FRAME_DEAD, f)
+	}
 }

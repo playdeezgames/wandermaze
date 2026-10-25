@@ -139,7 +139,70 @@ draw_stat :: proc(f: ^Frame, icon: Icon, label: string, value: int, y: int) {
 	draw_text_right(f, format_int(buf[:], value), PANEL_RIGHT, y + 1, COLOR_WHITE)
 }
 
-draw_cell :: proc(f: ^Frame, cell: Cell, c, r: int) {
+// Visual-only state: each square's flame frame and how long until it changes. It has its own
+// random stream, so flicker never disturbs the rules' RNG and tests can replay it exactly.
+FLAME_FRAMES :: 4
+FLICKER_FASTEST :: 0.07 // seconds between frame changes: 70 ms ...
+FLICKER_SLOWEST :: 0.22 // ... to 220 ms, random for every change
+
+Animation :: struct {
+	frame: [BOARD_COLUMNS][BOARD_ROWS]u8,
+	timer: [BOARD_COLUMNS][BOARD_ROWS]f32,
+	rng:   u64,
+}
+
+init_animation :: proc(a: ^Animation, seed: u64) {
+	a.rng = seed != 0 ? seed : 0x2545F4914F6CDD1D
+	for c in 0 ..< BOARD_COLUMNS {
+		for r in 0 ..< BOARD_ROWS {
+			a.frame[c][r] = u8(next_random(&a.rng, FLAME_FRAMES))
+			a.timer[c][r] = flicker_delay(a)
+		}
+	}
+}
+
+flicker_delay :: proc(a: ^Animation) -> f32 {
+	return FLICKER_FASTEST + (FLICKER_SLOWEST - FLICKER_FASTEST) * f32(next_random(&a.rng, 1000)) / 1000
+}
+
+// Advances every square's timer by dt seconds. A flame jumps to a random other frame when its
+// timer runs out, and goes back to the calm frame 0 four times in ten. Returns true when a
+// square that is on fire changed, i.e. when the picture needs redrawing.
+step_animation :: proc(a: ^Animation, g: ^Game, dt: f32) -> (changed: bool) {
+	for c in 0 ..< BOARD_COLUMNS {
+		for r in 0 ..< BOARD_ROWS {
+			a.timer[c][r] -= dt
+			if a.timer[c][r] > 0 {
+				continue
+			}
+			old := a.frame[c][r]
+			next := u8((int(old) + 1 + next_random(&a.rng, FLAME_FRAMES - 1)) % FLAME_FRAMES)
+			if old != 0 && next_random(&a.rng, 10) < 4 {
+				next = 0
+			}
+			a.frame[c][r] = next
+			a.timer[c][r] = flicker_delay(a)
+			if next != old && g.board[c][r] == .Fire {
+				changed = true
+			}
+		}
+	}
+	return
+}
+
+flame_icon :: proc(frame: u8) -> Icon {
+	switch frame % FLAME_FRAMES {
+	case 1:
+		return .Fire_1
+	case 2:
+		return .Fire_2
+	case 3:
+		return .Fire_3
+	}
+	return .Fire
+}
+
+draw_cell :: proc(f: ^Frame, cell: Cell, c, r: int, flame: Icon) {
 	x, y := c * TILE, r * TILE
 	floor: u8 = (c + r) % 2 == 0 ? COLOR_BACKGROUND : COLOR_FLOOR
 	if cell == .Dude || cell == .Dead_Dude {
@@ -148,7 +211,7 @@ draw_cell :: proc(f: ^Frame, cell: Cell, c, r: int) {
 	fill_rect(f, x, y, TILE, TILE, floor)
 	#partial switch cell {
 	case .Fire:
-		draw_icon(f, .Fire, x, y)
+		draw_icon(f, flame, x, y)
 	case .Ice:
 		draw_icon(f, .Drop, x, y)
 	case .Gold:
@@ -162,11 +225,16 @@ draw_cell :: proc(f: ^Frame, cell: Cell, c, r: int) {
 	}
 }
 
-draw_game :: proc(f: ^Frame, g: ^Game) {
+// The animation is optional: without one every flame shows its calm frame.
+draw_game :: proc(f: ^Frame, g: ^Game, animation: ^Animation = nil) {
 	clear_frame(f, COLOR_BACKGROUND)
 	for c in 0 ..< BOARD_COLUMNS {
 		for r in 0 ..< BOARD_ROWS {
-			draw_cell(f, g.board[c][r], c, r)
+			flame := Icon.Fire
+			if animation != nil {
+				flame = flame_icon(animation.frame[c][r])
+			}
+			draw_cell(f, g.board[c][r], c, r, flame)
 		}
 	}
 

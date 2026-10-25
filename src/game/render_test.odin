@@ -131,6 +131,122 @@ numbers_stay_inside_the_panel :: proc(t: ^testing.T) {
 }
 
 @(test)
+animation_replays_exactly_from_a_seed :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.board[3][3] = .Fire
+	a, b: Animation
+	init_animation(&a, 77)
+	init_animation(&b, 77)
+	for _ in 0 ..< 300 {
+		step_animation(&a, &g, 1.0 / 60)
+		step_animation(&b, &g, 1.0 / 60)
+	}
+	testing.expect(t, a == b)
+	other: Animation
+	init_animation(&other, 78)
+	testing.expect(t, other.frame != a.frame)
+}
+
+@(test)
+flames_start_out_of_step :: proc(t: ^testing.T) {
+	a: Animation
+	init_animation(&a, 5)
+	seen: [FLAME_FRAMES]bool
+	for column in a.frame {
+		for frame in column {
+			testing.expect(t, frame < FLAME_FRAMES)
+			seen[frame] = true
+		}
+	}
+	for s in seen {
+		testing.expect(t, s) // every frame is in use somewhere on the board
+	}
+	for column in a.timer {
+		for timer in column {
+			testing.expect(t, timer >= FLICKER_FASTEST && timer <= FLICKER_SLOWEST)
+		}
+	}
+}
+
+@(test)
+a_flame_changes_at_random_intervals :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.board[3][3] = .Fire
+	a: Animation
+	init_animation(&a, 9)
+	changes := 0
+	last := a.frame[3][3]
+	gaps: [dynamic]int
+	defer delete(gaps)
+	since := 0
+	for _ in 0 ..< 600 { // ten seconds at 60 Hz
+		step_animation(&a, &g, 1.0 / 60)
+		since += 1
+		if a.frame[3][3] != last {
+			last = a.frame[3][3]
+			changes += 1
+			append(&gaps, since)
+			since = 0
+		}
+	}
+	// 70 to 220 ms between changes: between 45 and 143 changes in ten seconds.
+	testing.expect(t, changes > 45 && changes < 143)
+	// The intervals are not all the same: that is the randomness.
+	varied := false
+	for gap in gaps {
+		if gap != gaps[0] {
+			varied = true
+		}
+	}
+	testing.expect(t, varied)
+}
+
+@(test)
+only_fire_squares_ask_for_a_redraw :: proc(t: ^testing.T) {
+	g := blank_game() // no fire anywhere
+	a: Animation
+	init_animation(&a, 3)
+	for _ in 0 ..< 300 {
+		testing.expect(t, !step_animation(&a, &g, 1.0 / 60))
+	}
+	g.board[1][1] = .Fire
+	redraws := 0
+	for _ in 0 ..< 300 {
+		if step_animation(&a, &g, 1.0 / 60) {
+			redraws += 1
+		}
+	}
+	testing.expect(t, redraws > 10)
+}
+
+@(test)
+fire_draws_its_current_frame :: proc(t: ^testing.T) {
+	f := new(Frame)
+	defer free(f)
+	g := blank_game()
+	g.board[2][3] = .Fire
+	a: Animation
+	init_animation(&a, 1)
+	for want in 0 ..< FLAME_FRAMES {
+		a.frame[2][3] = u8(want)
+		draw_game(f, &g, &a)
+		icon := flame_icon(u8(want))
+		for py in 0 ..< TILE {
+			for px in 0 ..< TILE {
+				if p := ICONS[icon][py * TILE + px]; p != 0 {
+					testing.expect_value(t, pixel(f, 2 * TILE + px, 3 * TILE + py), ICON_COLORS[icon][p - 1])
+				}
+			}
+		}
+	}
+	// The four frames really are different pictures.
+	testing.expect(t, ICONS[Icon.Fire] != ICONS[Icon.Fire_1])
+	testing.expect(t, ICONS[Icon.Fire_1] != ICONS[Icon.Fire_2])
+	testing.expect(t, ICONS[Icon.Fire_2] != ICONS[Icon.Fire_3])
+	testing.expect(t, ICONS[Icon.Fire_3] != ICONS[Icon.Fire])
+}
+
+@(test)
 resolve_maps_palette_to_rgba_bytes :: proc(t: ^testing.T) {
 	f := new(Frame)
 	defer free(f)
@@ -167,8 +283,10 @@ dump_frames :: proc(t: ^testing.T) {
 	g: Game
 	seed_game(&g, 1)
 	init_game(&g)
+	flames: Animation
+	init_animation(&flames, 1)
 	if DUMP_FRAME != "" {
-		draw_game(f, &g)
+		draw_game(f, &g, &flames)
 		write_ppm(t, DUMP_FRAME, f)
 	}
 	if DUMP_FRAME_DEAD != "" {
@@ -185,7 +303,7 @@ dump_frames :: proc(t: ^testing.T) {
 			}
 		}
 		testing.expect(t, !g.alive)
-		draw_game(f, &g)
+		draw_game(f, &g, &flames)
 		write_ppm(t, DUMP_FRAME_DEAD, f)
 	}
 }

@@ -92,8 +92,11 @@
 	});
 
 	const image = ctx.createImageData(W, H);
-	function frame() {
-		if (ex.platform_frame()) {
+	let last = performance.now();
+	function frame(now) {
+		const dt = Math.min((now - last) / 1000, 0.1); // seconds; capped after a hidden tab
+		last = now;
+		if (ex.platform_frame(dt)) {
 			// Read the buffer after the call: wasm memory may have grown.
 			image.data.set(new Uint8Array(memory.memory.buffer, ex.platform_frame_ptr(), W * H * 4));
 			ctx.putImageData(image, 0, 0);

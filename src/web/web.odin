@@ -18,6 +18,7 @@ Command :: enum i32 {
 state: struct {
 	rules: game.Game,
 	screen: game.Frame,
+	flames: game.Animation,
 	dirty: bool,
 }
 
@@ -28,6 +29,7 @@ main :: proc() {
 start :: proc(seed: u64) {
 	game.seed_game(&state.rules, seed)
 	game.init_game(&state.rules)
+	game.init_animation(&state.flames, seed ~ 0xF1A3E5)
 	state.dirty = true
 }
 
@@ -72,15 +74,17 @@ platform_take_sound :: proc "c" () -> i32 {
 	return i32(sound)
 }
 
-// Redraws if anything changed; returns 1 when the frame pointer has new pixels.
+// Called once per animation frame with the seconds since the last one. Redraws when a move
+// happened or a flame flickered; returns 1 when the frame pointer has new pixels.
 @(export)
-platform_frame :: proc "c" () -> i32 {
+platform_frame :: proc "c" (dt: f32) -> i32 {
 	context = runtime.default_context()
-	if !state.dirty {
+	flickered := game.step_animation(&state.flames, &state.rules, dt)
+	if !state.dirty && !flickered {
 		return 0
 	}
 	state.dirty = false
-	game.draw_game(&state.screen, &state.rules)
+	game.draw_game(&state.screen, &state.rules, &state.flames)
 	game.resolve(&state.screen)
 	return 1
 }

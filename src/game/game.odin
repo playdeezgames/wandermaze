@@ -65,10 +65,15 @@ seed_game :: proc(g: ^Game, seed: u64) {
 }
 
 random_range :: proc(g: ^Game, count: int) -> int {
-	g.rng ~= g.rng >> 12
-	g.rng ~= g.rng << 25
-	g.rng ~= g.rng >> 27
-	return int((g.rng * 0x2545F4914F6CDD1D) >> 33) % count
+	return next_random(&g.rng, count)
+}
+
+// xorshift64* on any state word, so the visual-only animation can have its own stream.
+next_random :: proc(state: ^u64, count: int) -> int {
+	state^ ~= state^ >> 12
+	state^ ~= state^ << 25
+	state^ ~= state^ >> 27
+	return int((state^ * 0x2545F4914F6CDD1D) >> 33) % count
 }
 
 init_board :: proc(g: ^Game) {

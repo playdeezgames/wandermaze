@@ -177,3 +177,42 @@ last_coin_starts_next_level :: proc(t: ^testing.T) {
 	testing.expect_value(t, counts[.Dude], 1)
 	testing.expect_value(t, counts[.Wall], wall_count(2))
 }
+
+@(test)
+each_move_has_its_sound :: proc(t: ^testing.T) {
+	g := blank_game()
+	move_dude(&g, 0, -1)
+	testing.expect_value(t, g.sound, Sound.Step)
+
+	g = blank_game()
+	g.board[6][5] = .Wall
+	move_dude(&g, 1, 0) // blocked: no new sound
+	testing.expect_value(t, g.sound, Sound.None)
+
+	g = blank_game()
+	g.board[4][5] = .Gold
+	move_dude(&g, -1, 0)
+	testing.expect_value(t, g.sound, Sound.Coin)
+
+	g = blank_game()
+	g.board[6][5] = .Ice
+	move_dude(&g, 1, 0)
+	testing.expect_value(t, g.sound, Sound.Ice)
+
+	g = blank_game()
+	g.protection = 1
+	g.board[5][6] = .Fire
+	move_dude(&g, 0, 1)
+	testing.expect_value(t, g.sound, Sound.Shield)
+
+	g = blank_game()
+	g.board[5][6] = .Fire
+	move_dude(&g, 0, 1)
+	testing.expect_value(t, g.sound, Sound.Death)
+
+	g = blank_game()
+	g.left = 1
+	g.board[5][4] = .Gold
+	move_dude(&g, 0, -1)
+	testing.expect_value(t, g.sound, Sound.Level_Up)
+}

@@ -64,6 +64,14 @@ platform_command :: proc "c" (command: i32) {
 	state.dirty = true
 }
 
+// The sound of the last move (game.Sound as an integer, 0 for none); reading it clears it.
+@(export)
+platform_take_sound :: proc "c" () -> i32 {
+	sound := state.rules.sound
+	state.rules.sound = .None
+	return i32(sound)
+}
+
 // Redraws if anything changed; returns 1 when the frame pointer has new pixels.
 @(export)
 platform_frame :: proc "c" () -> i32 {

@@ -30,6 +30,41 @@
 	const seed = crypto.getRandomValues(new Uint32Array(2));
 	ex.platform_init(seed[0], seed[1]);
 
+	// Sound effects from the Anvil, in game.Sound order (id 1 is the first file). The context is
+	// made now and decodes straight away; browsers keep it suspended until the first key or tap.
+	const SOUND_FILES = ["step", "ice", "shield", "coin", "level_up", "death"];
+	const SOUND_GAIN = [0.12, 0.25, 0.25, 0.25, 0.3, 0.3];
+	let audio = null, muted = false;
+	const buffers = [];
+	try {
+		audio = new (window.AudioContext || window.webkitAudioContext)();
+		SOUND_FILES.forEach((name, i) => {
+			fetch("sfx/" + name + ".wav")
+				.then((r) => r.arrayBuffer())
+				.then((data) => audio.decodeAudioData(data))
+				.then((buffer) => { buffers[i] = buffer; })
+				.catch(() => {});
+		});
+	} catch (e) { audio = null; }
+	function unlock() {
+		if (audio && audio.state === "suspended") audio.resume();
+	}
+	function play(id) {
+		const buffer = buffers[id - 1];
+		if (!audio || muted || !buffer) return;
+		const source = audio.createBufferSource();
+		const gain = audio.createGain();
+		source.buffer = buffer;
+		gain.gain.value = SOUND_GAIN[id - 1];
+		source.connect(gain).connect(audio.destination);
+		source.start();
+	}
+	function command(c) {
+		ex.platform_command(c);
+		const id = ex.platform_take_sound();
+		if (id) play(id);
+	}
+
 	// Matches platform_command in src/web/web.odin. The original uses the arrow keys and
 	// F2 (TIC-80 key 68) to restart; Enter, Space and R also restart here.
 	const KEYS = {
@@ -37,21 +72,23 @@
 		F2: 4, Enter: 4, " ": 4, r: 4, R: 4,
 	};
 	window.addEventListener("keydown", (e) => {
+		if (e.key === "m" || e.key === "M") { muted = !muted; return; }
 		if (!(e.key in KEYS)) return;
 		e.preventDefault();
 		if (e.repeat) return; // the cart uses keyp() with no auto-repeat
-		ex.platform_command(KEYS[e.key]);
+		unlock();
+		command(KEYS[e.key]);
 	});
 
 	// Touch: swipe on the canvas to move, tap to restart.
 	let touch = null;
-	canvas.addEventListener("pointerdown", (e) => { touch = { x: e.clientX, y: e.clientY }; });
+	canvas.addEventListener("pointerdown", (e) => { unlock(); touch = { x: e.clientX, y: e.clientY }; });
 	canvas.addEventListener("pointerup", (e) => {
 		if (!touch) return;
 		const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
 		touch = null;
-		if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { ex.platform_command(4); return; }
-		ex.platform_command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { command(4); return; }
+		command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
 	});
 
 	const image = ctx.createImageData(W, H);

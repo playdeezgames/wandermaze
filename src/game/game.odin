@@ -18,6 +18,17 @@ Cell :: enum u8 {
 	Dead_Dude,
 }
 
+// What the last move sounded like; the page plays it and clears it. Order is priority.
+Sound :: enum u8 {
+	None,
+	Step,
+	Ice,
+	Shield, // fire absorbed by protection
+	Coin,
+	Level_Up,
+	Death,
+}
+
 Game :: struct {
 	board:      [BOARD_COLUMNS][BOARD_ROWS]Cell,
 	column:     int,
@@ -28,6 +39,7 @@ Game :: struct {
 	level:      int,
 	moves:      int, // never updated by the original either
 	alive:      bool,
+	sound:      Sound,
 	rng:        u64,
 }
 
@@ -131,23 +143,30 @@ move_dude :: proc(g: ^Game, dx, dy: int) {
 		return
 	}
 	old_c, old_r := g.column, g.row
+	g.sound = .Step
 	#partial switch g.board[next_c][next_r] {
 	case .Wall:
+		g.sound = .None
 		return
 	case .Gold:
 		g.left -= 1
 		g.score += 1
+		g.sound = .Coin
 		if g.left == 0 {
 			g.level += 1
 			init_level(g)
+			g.sound = .Level_Up
 		}
 	case .Ice:
 		g.protection += 1
+		g.sound = .Ice
 	case .Fire:
 		if g.protection > 0 {
 			g.protection -= 1
+			g.sound = .Shield
 		} else {
 			g.alive = false
+			g.sound = .Death
 		}
 	}
 	g.board[old_c][old_r] = .Fire

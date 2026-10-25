@@ -33,6 +33,10 @@ The whole game is ~230 lines of Lua in a single code chunk:
 
 `src/game` is pure (rules in `game.odin`, software framebuffer and TIC-80-style proportional text in `render.odin`, generated `assets.odin`) and is imported as `tggd:game` via `-collection:tggd=src`. `src/web` (`#+build js`) only exports `proc "c"` functions; `web/index.html` owns `requestAnimationFrame`, input and `putImageData`. The core is deliberately faithful to the Lua quirks (see notes on coxswain task 72); the one deliberate deviation is that `place` stops instead of hanging when the board is full (level 15).
 
+## Sound
+
+The original is silent; the port adds six effects. `move_dude` sets `Game.sound` (`Sound` enum, one per move); `web/index.html` reads it through `platform_take_sound` after each command and plays the matching WAV (`SOUND_FILES` order must match the enum). The WAVs in `assets/sfx/` are exported from the Anvil world `assets/wandermaze.world.json` (PLAY text, square wave); `tools/build.sh` copies them into `build/web/sfx`. M mutes.
+
 ## Porting notes
 
 TIC-80 gives a fixed 240x136 screen, 16-color palette, `spr`/`print`/`keyp` APIs and a 60 Hz `TIC()` callback. A port needs to supply equivalents for those (a 240x136 canvas scaled up, the cart's palette and tile bitmaps, a bitmap font for `print`, key-press edge detection) and reproduce the logic above. `math.random` seeding behaviour does not need to match.

@@ -15,9 +15,9 @@ You are the little green fellow on a 17 by 17 board. Walk onto **gold** to score
 
 Here is the catch: **every square you leave turns into fire**, so there is no going back the way you came.
 
-**Controls:** arrow keys to move one step at a time. When you die, press F2 (or Enter, Space or R) to play again. On a phone or tablet, swipe to move and tap to restart.
+**Controls:** arrow keys to move one step at a time. When you die, press F2 (or Enter, Space or R) to play again. On a phone or tablet, swipe to move and tap to restart. Press M to mute the sound effects.
 
-**Made with:** the original was made in TIC-80. This version is a port to Odin, compiled to WebAssembly and drawn to a plain 2D canvas, with the original game's sprites and rules kept as they were. The port was made with Claude (generative AI) working alongside TheGrumpyGameDev.
+**Made with:** the original was made in TIC-80. This version is a port to Odin, compiled to WebAssembly and drawn to a plain 2D canvas, with the original game's sprites and rules kept as they were, plus new sound effects made with the Anvil of SPLORR!!, TheGrumpyGameDev's own asset tools. The port was made with Claude (generative AI) working alongside TheGrumpyGameDev.
 
 ## Notes (not for the page)
 
@@ -25,4 +25,5 @@ Here is the catch: **every square you leave turns into fire**, so there is no go
 - **The live page is tagged "No generative AI was used."** The port was written with Claude, so that tag and the disclosure line above need your decision before the port goes live. Nothing here changes the page.
 - On the Edit game screen: "Kind of project" HTML, "This file will be played in the browser" ticked, and an embed of 720 by 408 (the game is 240 by 136 and scales to fit).
 - The cover is `assets/cover.png` (630 by 500) and the screenshots are `assets/screenshots/`, both made by `tools/make_assets.sh` from the real renderer.
+- Sound effects are new in the port (the original is silent): six square-wave blips from the Anvil (`assets/wandermaze.world.json`, WAVs in `assets/sfx/`). Browsers keep audio locked until the first key or tap.
 - Known behaviour difference: the original hangs forever when the board fills up (level 15); the port keeps playing with a fuller board.

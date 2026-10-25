@@ -1,0 +1,43 @@
+{
+  "tile_width": 16,
+  "tile_height": 16,
+  "palette": [
+    {"r": 0, "g": 0, "b": 0},
+    {"r": 0, "g": 0, "b": 170},
+    {"r": 0, "g": 170, "b": 0},
+    {"r": 0, "g": 170, "b": 170},
+    {"r": 170, "g": 0, "b": 0},
+    {"r": 170, "g": 0, "b": 170},
+    {"r": 170, "g": 85, "b": 0},
+    {"r": 170, "g": 170, "b": 170},
+    {"r": 85, "g": 85, "b": 85},
+    {"r": 85, "g": 85, "b": 255},
+    {"r": 85, "g": 255, "b": 85},
+    {"r": 85, "g": 255, "b": 255},
+    {"r": 255, "g": 85, "b": 85},
+    {"r": 255, "g": 85, "b": 255},
+    {"r": 255, "g": 255, "b": 85},
+    {"r": 255, "g": 255, "b": 255}
+  ],
+  "tags": ["solid"],
+  "tilesets": [],
+  "terrain_sets": [],
+  "maps": [],
+  "sprite_sets": [],
+  "params": [],
+  "sounds": [
+    {"name": "step", "text": "MS T180 O2 L32 C", "loop": false},
+    {"name": "coin", "text": "T200 O5 L32 G L12 >C", "loop": false},
+    {"name": "ice", "text": "T220 O5 L32 E G E G >C", "loop": false},
+    {"name": "shield", "text": "T200 O3 L16 C P32 C >C", "loop": false},
+    {"name": "level_up", "text": "T170 O4 L16 C E G >C E G >C", "loop": false},
+    {"name": "death", "text": "T150 O4 L8 E C <A F L2 C", "loop": false}
+  ],
+  "feature_types": [],
+  "features": [],
+  "item_types": [],
+  "inventories": [],
+  "character_types": [],
+  "characters": [],
+  "player": null
+}

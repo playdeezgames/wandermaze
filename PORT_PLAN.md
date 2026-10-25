@@ -1,5 +1,7 @@
 # Wandermaze: Odin/WASM port plan
 
+> Historical plan. The port is done (tasks 71-80); on October 25, 2026 the graphics were redone with Urizen tiles at 340x204 (task 82), so the 240x136 / TIC-80-font details below describe the first, pixel-parity version. See CLAUDE.md for the current layout.
+
 Follows the bok's `Tech/Odin wasm recipe.md` (Murder Hobo / Fortune Hunter "software framebuffer" variant, combined with the Roomba Rights pure-core split) and `Tech/Release standard.md`. Coxswain project: `wandermaze` (tasks 71-78; 75 cancelled).
 
 ## Goal

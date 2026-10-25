@@ -9,18 +9,18 @@
 	body { display: flex; align-items: center; justify-content: center; }
 	canvas {
 		image-rendering: pixelated;
-		width: min(100vw, calc(100vh * 240 / 136));
-		height: min(100vh, calc(100vw * 136 / 240));
+		width: min(100vw, calc(100vh * 340 / 204));
+		height: min(100vh, calc(100vw * 204 / 340));
 		touch-action: none;
 	}
 </style>
 </head>
 <body>
-<canvas id="screen" width="240" height="136"></canvas>
+<canvas id="screen" width="340" height="204"></canvas>
 <script src="odin.js"></script>
 <script>
 (async function () {
-	const W = 240, H = 136;
+	const W = 340, H = 204;
 	const canvas = document.getElementById("screen");
 	const ctx = canvas.getContext("2d");
 	const memory = new odin.WasmMemoryInterface();

@@ -1,0 +1,1 @@
+`font.inl` is the TIC-80 built-in font (`src/core/font.inl` from https://github.com/nesbox/TIC-80, MIT licence, Copyright (c) 2017 Vadim Grigoruk @nesbox). The cartridge does not contain it: `print` uses the runtime's font. Rows are 1 byte per scanline, 8 bytes per character starting at ASCII 0, least significant bit is the leftmost pixel.

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wandermaze</title>
+<style>
+	html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+	body { display: flex; align-items: center; justify-content: center; }
+	canvas {
+		image-rendering: pixelated;
+		width: min(100vw, calc(100vh * 240 / 136));
+		height: min(100vh, calc(100vw * 136 / 240));
+		touch-action: none;
+	}
+</style>
+</head>
+<body>
+<canvas id="screen" width="240" height="136"></canvas>
+<script src="odin.js"></script>
+<script>
+(async function () {
+	const W = 240, H = 136;
+	const canvas = document.getElementById("screen");
+	const ctx = canvas.getContext("2d");
+	const memory = new odin.WasmMemoryInterface();
+	await odin.runWasm("game.wasm", null, {}, memory);
+	const ex = memory.exports;
+
+	const seed = crypto.getRandomValues(new Uint32Array(2));
+	ex.platform_init(seed[0], seed[1]);
+
+	// Matches platform_command in src/web/web.odin. The original uses the arrow keys and
+	// F2 (TIC-80 key 68) to restart; Enter, Space and R also restart here.
+	const KEYS = {
+		ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3,
+		F2: 4, Enter: 4, " ": 4, r: 4, R: 4,
+	};
+	window.addEventListener("keydown", (e) => {
+		if (!(e.key in KEYS)) return;
+		e.preventDefault();
+		if (e.repeat) return; // the cart uses keyp() with no auto-repeat
+		ex.platform_command(KEYS[e.key]);
+	});
+
+	// Touch: swipe on the canvas to move, tap to restart.
+	let touch = null;
+	canvas.addEventListener("pointerdown", (e) => { touch = { x: e.clientX, y: e.clientY }; });
+	canvas.addEventListener("pointerup", (e) => {
+		if (!touch) return;
+		const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+		touch = null;
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { ex.platform_command(4); return; }
+		ex.platform_command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
+	});
+
+	const image = ctx.createImageData(W, H);
+	function frame() {
+		if (ex.platform_frame()) {
+			// Read the buffer after the call: wasm memory may have grown.
+			image.data.set(new Uint8Array(memory.memory.buffer, ex.platform_frame_ptr(), W * H * 4));
+			ctx.putImageData(image, 0, 0);
+		}
+		requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

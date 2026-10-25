@@ -68,6 +68,8 @@ platform_command :: proc "c" (command: i32) {
 			game.move_dude(g, 1, 0)
 		case .Restart:
 		}
+	case .Level_Complete:
+		game.proceed(g) // any key once the screen has waited a moment
 	case .Game_Over:
 		if Command(command) == .Restart {
 			game.restart(g)
@@ -103,4 +105,26 @@ platform_frame :: proc "c" (dt: f32) -> i32 {
 @(export)
 platform_frame_ptr :: proc "c" () -> rawptr {
 	return &state.screen.rgba
+}
+
+// QA hook (the page exposes it only with ?qa in the address): clears the current level through
+// the real rules by dropping the last coin on a free neighbouring square and stepping onto it.
+@(export)
+qa_clear_level :: proc "c" () {
+	context = runtime.default_context()
+	g := &state.rules
+	if g.phase == .Title {
+		game.begin(g)
+	}
+	for dir in ([?][2]int{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}) {
+		c, r := g.column + dir.x, g.row + dir.y
+		if c < 0 || r < 0 || c >= game.BOARD_COLUMNS || r >= game.BOARD_ROWS {
+			continue
+		}
+		g.left = 1
+		g.board[c][r] = .Gold
+		game.move_dude(g, dir.x, dir.y)
+		break
+	}
+	state.dirty = true
 }

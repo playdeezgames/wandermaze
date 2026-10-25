@@ -253,6 +253,7 @@ draw_cell :: proc(f: ^Frame, cell: Cell, c, r: int, flame: Icon) {
 }
 
 COLOR_TITLE :: 7
+COLOR_COIN :: 6
 
 draw_title :: proc(f: ^Frame, animation: ^Animation) {
 	clear_frame(f, COLOR_BACKGROUND)
@@ -303,6 +304,59 @@ draw_game_over :: proc(f: ^Frame, g: ^Game, animation: ^Animation) {
 	}
 }
 
+// "Fire 48" style groups, icon then number, laid out in one centred row.
+draw_icon_counts :: proc(f: ^Frame, counts: []struct {
+		icon:  Icon,
+		count: int,
+	}, center_x, y: int) {
+	GAP :: 18
+	buf: [24]u8
+	total := -GAP
+	for item in counts {
+		total += TILE + 4 + text_width(format_int(buf[:], item.count)) + GAP
+	}
+	x := center_x - total / 2
+	for item in counts {
+		draw_icon(f, item.icon, x, y)
+		text := format_int(buf[:], item.count)
+		draw_text(f, text, x + TILE + 4, y + 1, COLOR_WHITE)
+		x += TILE + 4 + text_width(text) + GAP
+	}
+}
+
+// Between levels: what carries over and what the next board holds. The board is already dealt.
+draw_level_complete :: proc(f: ^Frame, g: ^Game, animation: ^Animation) {
+	clear_frame(f, COLOR_BACKGROUND)
+	center := SCREEN_WIDTH / 2
+	width := draw_text(f, "Level cleared", center - text_width("Level cleared", 2, true) / 2, 14, COLOR_COIN, 2, true)
+	draw_icon(f, .Coin, center - width / 2 - TILE - 10, 20)
+	draw_icon(f, .Coin, center + width / 2 + 10, 20)
+	buf: [24]u8
+	line: [48]u8
+	draw_text_centered(f, join_number(line[:], "You cleared level ", g.level - 1, buf[:]), center, 52, COLOR_WHITE)
+
+	// What you keep.
+	left, right := 84, SCREEN_WIDTH - 84
+	draw_icon(f, .Star, left, 84)
+	draw_text(f, "Score", left + TILE + 6, 85, COLOR_DIM)
+	draw_text_right(f, format_int(buf[:], g.score), right, 85, COLOR_WHITE)
+	draw_icon(f, .Drop, left, 102)
+	draw_text(f, "Protection", left + TILE + 6, 103, COLOR_DIM)
+	draw_text_right(f, format_int(buf[:], g.protection), right, 103, COLOR_WHITE)
+	fill_rect(f, left, 124, right - left, 1, COLOR_LINE)
+
+	// What is coming.
+	draw_text_centered(f, join_number(line[:], "Next: level ", g.level, buf[:]), center, 132, COLOR_WHITE)
+	draw_icon_counts(f, []struct {
+		icon:  Icon,
+		count: int,
+	}{{.Coin, coin_count(g.level)}, {.Fire, fire_count(g.level)}, {.Boulder, wall_count(g.level)}, {.Drop, ice_count(g.level)}}, center, 152)
+
+	if input_ready(g) && (animation == nil || animation.blink) {
+		draw_text_centered(f, "Press Enter to continue", center, 182, COLOR_ALIVE)
+	}
+}
+
 join_number :: proc(buf: []u8, prefix: string, value: int, scratch: []u8) -> string {
 	digits := format_int(scratch, value)
 	n := copy(buf, prefix)
@@ -314,6 +368,10 @@ join_number :: proc(buf: []u8, prefix: string, value: int, scratch: []u8) -> str
 draw_game :: proc(f: ^Frame, g: ^Game, animation: ^Animation = nil) {
 	if g.phase == .Title {
 		draw_title(f, animation)
+		return
+	}
+	if g.phase == .Level_Complete {
+		draw_level_complete(f, g, animation)
 		return
 	}
 	clear_frame(f, COLOR_BACKGROUND)

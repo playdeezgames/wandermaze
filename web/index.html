@@ -27,6 +27,8 @@
 	await odin.runWasm("game.wasm", null, {}, memory);
 	const ex = memory.exports;
 
+	if (location.search.includes("qa")) window.__wandermaze = ex; // QA only: ex.qa_clear_level()
+
 	const seed = crypto.getRandomValues(new Uint32Array(2));
 	ex.platform_init(seed[0], seed[1]);
 

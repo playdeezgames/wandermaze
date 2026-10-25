@@ -262,3 +262,43 @@ only_game_over_waits_to_restart :: proc(t: ^testing.T) {
 	testing.expect(t, !tick(&g, 100)) // playing: never "ready"
 	testing.expect(t, !restart(&g))
 }
+
+@(test)
+last_coin_shows_the_between_levels_screen :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.left = 1
+	g.board[5][4] = .Gold
+	move_dude(&g, 0, -1)
+	testing.expect_value(t, g.phase, Phase.Level_Complete)
+	testing.expect_value(t, g.level, 2)
+	testing.expect_value(t, g.left, coin_count(2))
+	testing.expect(t, g.alive)
+
+	row := g.row
+	move_dude(&g, 0, -1) // no walking while the screen is up
+	testing.expect_value(t, g.row, row)
+	testing.expect(t, !restart(&g)) // restart is for game over only
+	testing.expect(t, !proceed(&g)) // too soon
+	testing.expect(t, !tick(&g, LEVEL_COMPLETE_DELAY / 2))
+	testing.expect(t, !proceed(&g))
+	testing.expect(t, tick(&g, LEVEL_COMPLETE_DELAY)) // the prompt becomes ready: redraw
+	testing.expect(t, !tick(&g, 1)) // reported once
+	testing.expect(t, proceed(&g))
+	testing.expect_value(t, g.phase, Phase.Playing)
+	testing.expect(t, !proceed(&g)) // only from that screen
+
+	g.board[5][3] = .Empty // the new board is random; make the next step safe
+	move_dude(&g, 0, -1)
+	testing.expect_value(t, g.row, 3) // and play carries on
+}
+
+@(test)
+other_screens_ignore_proceed :: proc(t: ^testing.T) {
+	g := blank_game()
+	testing.expect(t, !proceed(&g)) // playing
+	g.phase = .Title
+	testing.expect(t, !proceed(&g))
+	g.phase = .Game_Over
+	g.phase_time = 10
+	testing.expect(t, !proceed(&g))
+}

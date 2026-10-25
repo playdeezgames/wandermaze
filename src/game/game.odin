@@ -32,12 +32,16 @@ Sound :: enum u8 {
 Phase :: enum u8 {
 	Title,
 	Playing,
+	Level_Complete, // between levels: the next board is already dealt
 	Game_Over,
 }
 
 // After dying, restart is refused for this many seconds so a key still being mashed cannot
 // skip the game over screen.
 GAME_OVER_DELAY :: 0.8
+
+// Likewise for the screen between levels, so the next move cannot skip it.
+LEVEL_COMPLETE_DELAY :: 0.6
 
 Game :: struct {
 	board:      [BOARD_COLUMNS][BOARD_ROWS]Cell,
@@ -178,6 +182,8 @@ move_dude :: proc(g: ^Game, dx, dy: int) {
 			g.level += 1
 			init_level(g)
 			g.sound = .Level_Up
+			g.phase = .Level_Complete
+			g.phase_time = 0
 		}
 	case .Ice:
 		g.protection += 1
@@ -198,20 +204,42 @@ move_dude :: proc(g: ^Game, dx, dy: int) {
 	g.column, g.row = next_c, next_r
 }
 
-// Advances the clock. Returns true when the game over screen just became ready for a restart.
+// Advances the clock. Returns true when a screen that waits for a key just became ready for it.
 tick :: proc(g: ^Game, dt: f32) -> (became_ready: bool) {
-	was_ready := restart_ready(g)
+	was_ready := input_ready(g)
 	g.phase_time += dt
-	return !was_ready && restart_ready(g)
+	return !was_ready && input_ready(g)
+}
+
+// True when the game over or between-levels screen has waited long enough to accept a key.
+input_ready :: proc(g: ^Game) -> bool {
+	switch g.phase {
+	case .Game_Over:
+		return g.phase_time >= GAME_OVER_DELAY
+	case .Level_Complete:
+		return g.phase_time >= LEVEL_COMPLETE_DELAY
+	case .Title, .Playing:
+	}
+	return false
 }
 
 restart_ready :: proc(g: ^Game) -> bool {
-	return g.phase == .Game_Over && g.phase_time >= GAME_OVER_DELAY
+	return g.phase == .Game_Over && input_ready(g)
 }
 
 // Leaves the title screen; the board behind it is already dealt.
 begin :: proc(g: ^Game) -> bool {
 	if g.phase != .Title {
+		return false
+	}
+	g.phase = .Playing
+	g.phase_time = 0
+	return true
+}
+
+// Leaves the between-levels screen once it has waited long enough.
+proceed :: proc(g: ^Game) -> bool {
+	if g.phase != .Level_Complete || !input_ready(g) {
 		return false
 	}
 	g.phase = .Playing

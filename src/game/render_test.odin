@@ -367,6 +367,45 @@ game_over_box_shows_stats_and_prompt_after_the_delay :: proc(t: ^testing.T) {
 }
 
 @(test)
+between_levels_screen_shows_what_carries_over :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.left = 1
+	g.score = 15
+	g.protection = 2
+	g.board[5][4] = .Gold
+	move_dude(&g, 0, -1)
+	testing.expect_value(t, g.phase, Phase.Level_Complete)
+	a: Animation
+	init_animation(&a, 6)
+	a.blink = true
+	early, ready, other := new(Frame), new(Frame), new(Frame)
+	defer free(early)
+	defer free(ready)
+	defer free(other)
+	draw_game(early, &g, &a)
+	// Neither the board nor the stats panel is drawn.
+	testing.expect_value(t, pixel(early, PANEL_X, 100), u8(COLOR_BACKGROUND))
+	testing.expect_value(t, pixel(early, 5 * TILE + 1, 5 * TILE + 1), u8(COLOR_BACKGROUND))
+	// The prompt appears only after the delay, and blinks.
+	tick(&g, LEVEL_COMPLETE_DELAY + 0.1)
+	draw_game(ready, &g, &a)
+	testing.expect(t, region_differs(early, ready, 0, 176, SCREEN_WIDTH, 198))
+	testing.expect(t, !region_differs(early, ready, 0, 0, SCREEN_WIDTH, 176))
+	a.blink = false
+	draw_game(other, &g, &a)
+	testing.expect(t, region_differs(ready, other, 0, 176, SCREEN_WIDTH, 198))
+	// The numbers are live: score and protection, and the next level's counts.
+	g.score, g.protection = 99, 7
+	a.blink = true
+	draw_game(other, &g, &a)
+	testing.expect(t, region_differs(ready, other, 84, 80, SCREEN_WIDTH - 84, 120))
+	g.level = 5
+	draw_game(ready, &g, &a)
+	testing.expect(t, region_differs(ready, other, 0, 128, SCREEN_WIDTH, 170)) // next level preview
+	testing.expect(t, region_differs(ready, other, 0, 44, SCREEN_WIDTH, 70)) // "You cleared level N"
+}
+
+@(test)
 resolve_maps_palette_to_rgba_bytes :: proc(t: ^testing.T) {
 	f := new(Frame)
 	defer free(f)
@@ -382,6 +421,7 @@ resolve_maps_palette_to_rgba_bytes :: proc(t: ^testing.T) {
 DUMP_FRAME :: #config(DUMP_FRAME, "")
 DUMP_FRAME_DEAD :: #config(DUMP_FRAME_DEAD, "")
 DUMP_FRAME_TITLE :: #config(DUMP_FRAME_TITLE, "")
+DUMP_FRAME_LEVEL :: #config(DUMP_FRAME_LEVEL, "")
 
 write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 	resolve(f)
@@ -396,7 +436,7 @@ write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 
 @(test)
 dump_frames :: proc(t: ^testing.T) {
-	if DUMP_FRAME == "" && DUMP_FRAME_DEAD == "" && DUMP_FRAME_TITLE == "" {
+	if DUMP_FRAME == "" && DUMP_FRAME_DEAD == "" && DUMP_FRAME_TITLE == "" && DUMP_FRAME_LEVEL == "" {
 		return
 	}
 	f := new(Frame)
@@ -412,6 +452,14 @@ dump_frames :: proc(t: ^testing.T) {
 		draw_game(f, &g, &flames)
 		write_ppm(t, DUMP_FRAME_TITLE, f)
 		g.phase = .Playing
+	}
+	if DUMP_FRAME_LEVEL != "" {
+		g.phase = .Level_Complete
+		g.level, g.score, g.protection = 2, 16, 2
+		tick(&g, LEVEL_COMPLETE_DELAY + 0.1)
+		draw_game(f, &g, &flames)
+		write_ppm(t, DUMP_FRAME_LEVEL, f)
+		g.phase, g.level, g.score, g.protection = .Playing, 1, 0, 0
 	}
 	if DUMP_FRAME != "" {
 		draw_game(f, &g, &flames)

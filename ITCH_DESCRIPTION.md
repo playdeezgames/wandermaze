@@ -15,7 +15,7 @@ You are the little green fellow on a 17 by 17 board. Walk onto **gold** to score
 
 Here is the catch: **every square you leave turns into fire**, so there is no going back the way you came.
 
-**Controls:** arrow keys to move one step at a time. When you die, press F2 (or Enter, Space or R) to play again. On a phone or tablet, swipe to move and tap to restart. Press M to mute the sound effects.
+**Controls:** press Enter (or any arrow key) on the title screen to start, then use the arrow keys to move one step at a time. When you die, press F2 (or Enter, Space or R) on the game over screen to play again. On a phone or tablet, swipe to move and tap to restart. Press M to mute the sound effects.
 
 **Made with:** the original was made in TIC-80. This version is a port to Odin, compiled to WebAssembly and drawn to a plain 2D canvas, with the original game's rules kept as they were, new pixel art, and new sound effects made with the Anvil of SPLORR!!, TheGrumpyGameDev's own asset tools. The icons and the text come from the Urizen 1-bit tileset by vurmux (CC0, https://vurmux.itch.io/urizen-onebit-tileset); the flame and the water droplet are hand-drawn to match. The port was made with Claude (generative AI) working alongside TheGrumpyGameDev.
 

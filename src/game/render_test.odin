@@ -101,9 +101,8 @@ panel_shows_state :: proc(t: ^testing.T) {
 	draw_game(a, &g)
 	g.alive = false
 	draw_game(b, &g)
-	// The status line and the bottom hint change when the player dies.
+	// The status line changes when the player dies.
 	testing.expect(t, region_differs(a, b, PANEL_X + 8, 30, SCREEN_WIDTH, 56))
-	testing.expect(t, region_differs(a, b, PANEL_X + 8, 170, SCREEN_WIDTH, SCREEN_HEIGHT))
 	// Each stat changes its own line.
 	g = blank_game()
 	draw_game(a, &g)
@@ -247,6 +246,127 @@ fire_draws_its_current_frame :: proc(t: ^testing.T) {
 }
 
 @(test)
+decorative_font_has_letters_only :: proc(t: ^testing.T) {
+	for ch in "GAME OVERWandermaze" {
+		if ch == ' ' {
+			continue
+		}
+		start, end := glyph_span(u8(ch), true)
+		testing.expect(t, end > start)
+	}
+	start, end := glyph_span('7', true)
+	testing.expect_value(t, end - start, 0) // no digits in the decorative font
+}
+
+@(test)
+scaled_text_is_wider_and_taller :: proc(t: ^testing.T) {
+	testing.expect_value(t, text_width("Wandermaze", 3, true), 3 * text_width("Wandermaze", 1, true))
+	f := new(Frame)
+	defer free(f)
+	clear_frame(f, 0)
+	draw_text(f, "A", 10, 10, COLOR_WHITE, 3)
+	lowest := 0
+	for y in 0 ..< SCREEN_HEIGHT {
+		for x in 0 ..< SCREEN_WIDTH {
+			if pixel(f, x, y) == COLOR_WHITE {
+				lowest = max(lowest, y)
+			}
+		}
+	}
+	testing.expect(t, lowest >= 10 + 3 * 9) // glyph rows reach the scaled height
+}
+
+@(test)
+title_screen_has_no_board_and_blinks :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.board[3][3] = .Fire
+	g.phase = .Title
+	title, play := new(Frame), new(Frame)
+	defer free(title)
+	defer free(play)
+	a: Animation
+	init_animation(&a, 4)
+	a.blink = true
+	draw_game(title, &g, &a)
+	g.phase = .Playing
+	draw_game(play, &g, &a)
+	testing.expect(t, region_differs(title, play, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+	// No stats panel line on the title screen.
+	testing.expect_value(t, pixel(title, PANEL_X, 100), u8(COLOR_BACKGROUND))
+	// The prompt is there while blinking on and gone while off.
+	g.phase = .Title
+	blink_on, blink_off := new(Frame), new(Frame)
+	defer free(blink_on)
+	defer free(blink_off)
+	draw_game(blink_on, &g, &a)
+	a.blink = false
+	draw_game(blink_off, &g, &a)
+	testing.expect(t, region_differs(blink_on, blink_off, 0, 160, SCREEN_WIDTH, 184))
+	testing.expect(t, !region_differs(blink_on, blink_off, 0, 0, SCREEN_WIDTH, 160)) // flames unchanged
+}
+
+@(test)
+blinking_asks_for_redraws_only_off_the_playing_screen :: proc(t: ^testing.T) {
+	g := blank_game() // playing, no fire
+	a: Animation
+	init_animation(&a, 8)
+	for _ in 0 ..< 120 {
+		testing.expect(t, !step_animation(&a, &g, 1.0 / 60))
+	}
+	g.phase = .Title
+	redraws := 0
+	for _ in 0 ..< 120 { // two seconds: about five blinks
+		if step_animation(&a, &g, 1.0 / 60) {
+			redraws += 1
+		}
+	}
+	testing.expect(t, redraws >= 4)
+}
+
+@(test)
+game_over_box_shows_stats_and_prompt_after_the_delay :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.level, g.score = 3, 41
+	g.board[5][6] = .Fire
+	move_dude(&g, 0, 1)
+	testing.expect_value(t, g.phase, Phase.Game_Over)
+	a: Animation
+	init_animation(&a, 2)
+	a.blink = true
+	early, ready, play := new(Frame), new(Frame), new(Frame)
+	defer free(early)
+	defer free(ready)
+	defer free(play)
+	draw_game(early, &g, &a)
+	tick(&g, GAME_OVER_DELAY + 0.1)
+	draw_game(ready, &g, &a)
+	g.phase = .Playing
+	draw_game(play, &g, &a)
+	// The player died on row 6 (upper half), so the box sits at the bottom of the board.
+	box := BOARD_PIXELS - 92 - 4
+	testing.expect(t, region_differs(early, play, 6, box, BOARD_PIXELS - 6, BOARD_PIXELS - 4))
+	testing.expect(t, region_differs(early, ready, 6, box + 70, BOARD_PIXELS - 6, box + 90)) // prompt row
+	testing.expect(t, !region_differs(early, ready, 6, box, BOARD_PIXELS - 6, box + 70)) // text rows
+	// The skeleton stays visible, outside the box.
+	for py in 0 ..< TILE {
+		for px in 0 ..< TILE {
+			if ICONS[Icon.Skeleton][py * TILE + px] != 0 {
+				testing.expect_value(t, pixel(ready, g.column * TILE + px, g.row * TILE + py), ICON_COLORS[Icon.Skeleton][0])
+			}
+		}
+	}
+	// Dying in the lower half moves the box to the top.
+	g = blank_game()
+	g.row = 12
+	init_board(&g)
+	g.board[5][13] = .Fire
+	move_dude(&g, 0, 1)
+	draw_game(play, &g, &a)
+	testing.expect_value(t, pixel(play, 6, 4), u8(COLOR_LINE)) // top-left corner of the box
+	testing.expect(t, pixel(play, 6, BOARD_PIXELS - 5) != COLOR_LINE) // nothing at the bottom
+}
+
+@(test)
 resolve_maps_palette_to_rgba_bytes :: proc(t: ^testing.T) {
 	f := new(Frame)
 	defer free(f)
@@ -261,6 +381,7 @@ resolve_maps_palette_to_rgba_bytes :: proc(t: ^testing.T) {
 // tools/make_assets.sh.
 DUMP_FRAME :: #config(DUMP_FRAME, "")
 DUMP_FRAME_DEAD :: #config(DUMP_FRAME_DEAD, "")
+DUMP_FRAME_TITLE :: #config(DUMP_FRAME_TITLE, "")
 
 write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 	resolve(f)
@@ -275,7 +396,7 @@ write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 
 @(test)
 dump_frames :: proc(t: ^testing.T) {
-	if DUMP_FRAME == "" && DUMP_FRAME_DEAD == "" {
+	if DUMP_FRAME == "" && DUMP_FRAME_DEAD == "" && DUMP_FRAME_TITLE == "" {
 		return
 	}
 	f := new(Frame)
@@ -285,6 +406,13 @@ dump_frames :: proc(t: ^testing.T) {
 	init_game(&g)
 	flames: Animation
 	init_animation(&flames, 1)
+	flames.blink = true
+	if DUMP_FRAME_TITLE != "" {
+		g.phase = .Title
+		draw_game(f, &g, &flames)
+		write_ppm(t, DUMP_FRAME_TITLE, f)
+		g.phase = .Playing
+	}
 	if DUMP_FRAME != "" {
 		draw_game(f, &g, &flames)
 		write_ppm(t, DUMP_FRAME, f)
@@ -303,6 +431,7 @@ dump_frames :: proc(t: ^testing.T) {
 			}
 		}
 		testing.expect(t, !g.alive)
+		tick(&g, GAME_OVER_DELAY + 0.1) // so the prompt shows
 		draw_game(f, &g, &flames)
 		write_ppm(t, DUMP_FRAME_DEAD, f)
 	}

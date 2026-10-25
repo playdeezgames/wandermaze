@@ -29,6 +29,16 @@ Sound :: enum u8 {
 	Death,
 }
 
+Phase :: enum u8 {
+	Title,
+	Playing,
+	Game_Over,
+}
+
+// After dying, restart is refused for this many seconds so a key still being mashed cannot
+// skip the game over screen.
+GAME_OVER_DELAY :: 0.8
+
 Game :: struct {
 	board:      [BOARD_COLUMNS][BOARD_ROWS]Cell,
 	column:     int,
@@ -39,6 +49,8 @@ Game :: struct {
 	level:      int,
 	moves:      int, // never updated by the original either
 	alive:      bool,
+	phase:      Phase,
+	phase_time: f32, // seconds in this phase
 	sound:      Sound,
 	rng:        u64,
 }
@@ -130,6 +142,8 @@ init_level :: proc(g: ^Game) {
 init_game :: proc(g: ^Game) {
 	g.score = 0
 	g.alive = true
+	g.phase = .Playing
+	g.phase_time = 0
 	g.protection = 0
 	g.level = 1
 	g.moves = 0
@@ -143,6 +157,9 @@ init_game :: proc(g: ^Game) {
 // is set to fire and the dude is put on the new one (so a coin generated on the
 // destination cell is overwritten and can never be collected).
 move_dude :: proc(g: ^Game, dx, dy: int) {
+	if g.phase != .Playing {
+		return
+	}
 	next_c, next_r := g.column + dx, g.row + dy
 	if next_c < 0 || next_r < 0 || next_c >= BOARD_COLUMNS || next_r >= BOARD_ROWS {
 		return
@@ -172,9 +189,41 @@ move_dude :: proc(g: ^Game, dx, dy: int) {
 		} else {
 			g.alive = false
 			g.sound = .Death
+			g.phase = .Game_Over
+			g.phase_time = 0
 		}
 	}
 	g.board[old_c][old_r] = .Fire
 	g.board[next_c][next_r] = g.alive ? .Dude : .Dead_Dude
 	g.column, g.row = next_c, next_r
+}
+
+// Advances the clock. Returns true when the game over screen just became ready for a restart.
+tick :: proc(g: ^Game, dt: f32) -> (became_ready: bool) {
+	was_ready := restart_ready(g)
+	g.phase_time += dt
+	return !was_ready && restart_ready(g)
+}
+
+restart_ready :: proc(g: ^Game) -> bool {
+	return g.phase == .Game_Over && g.phase_time >= GAME_OVER_DELAY
+}
+
+// Leaves the title screen; the board behind it is already dealt.
+begin :: proc(g: ^Game) -> bool {
+	if g.phase != .Title {
+		return false
+	}
+	g.phase = .Playing
+	g.phase_time = 0
+	return true
+}
+
+// Starts a new game from the game over screen once the delay has passed.
+restart :: proc(g: ^Game) -> bool {
+	if !restart_ready(g) {
+		return false
+	}
+	init_game(g)
+	return true
 }

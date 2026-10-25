@@ -8,6 +8,7 @@ blank_game :: proc() -> Game {
 	g: Game
 	seed_game(&g, 42)
 	g.alive = true
+	g.phase = .Playing
 	g.level = 1
 	g.left = 16
 	g.column, g.row = 5, 5
@@ -215,4 +216,49 @@ each_move_has_its_sound :: proc(t: ^testing.T) {
 	g.board[5][4] = .Gold
 	move_dude(&g, 0, -1)
 	testing.expect_value(t, g.sound, Sound.Level_Up)
+}
+
+@(test)
+phases_run_title_playing_game_over :: proc(t: ^testing.T) {
+	g: Game
+	seed_game(&g, 11)
+	init_game(&g)
+	testing.expect_value(t, g.phase, Phase.Playing)
+	g.phase = .Title // the page shows the title first
+
+	column, row := g.column, g.row
+	move_dude(&g, 1, 0)
+	move_dude(&g, -1, 0)
+	testing.expect(t, g.column == column && g.row == row) // no moves on the title screen
+	testing.expect(t, !restart(&g))
+	testing.expect(t, begin(&g))
+	testing.expect_value(t, g.phase, Phase.Playing)
+	testing.expect(t, !begin(&g)) // only works from the title
+}
+
+@(test)
+dying_shows_game_over_and_restart_waits :: proc(t: ^testing.T) {
+	g := blank_game()
+	g.board[5][6] = .Fire
+	move_dude(&g, 0, 1)
+	testing.expect_value(t, g.phase, Phase.Game_Over)
+	testing.expect(t, !g.alive)
+
+	move_dude(&g, 0, 1) // dead players do not walk
+	testing.expect_value(t, g.row, 6)
+	testing.expect(t, !restart(&g)) // too soon
+	testing.expect(t, !tick(&g, GAME_OVER_DELAY / 2))
+	testing.expect(t, !restart(&g))
+	testing.expect(t, tick(&g, GAME_OVER_DELAY)) // crosses the delay: asks for a redraw
+	testing.expect(t, !tick(&g, 1)) // only reported once
+	testing.expect(t, restart(&g))
+	testing.expect_value(t, g.phase, Phase.Playing)
+	testing.expect(t, g.alive && g.score == 0 && g.level == 1)
+}
+
+@(test)
+only_game_over_waits_to_restart :: proc(t: ^testing.T) {
+	g := blank_game()
+	testing.expect(t, !tick(&g, 100)) // playing: never "ready"
+	testing.expect(t, !restart(&g))
 }

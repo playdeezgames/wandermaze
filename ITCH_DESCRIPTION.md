@@ -2,12 +2,15 @@
 
 Page: https://thegrumpygamedev.itch.io/wandermaze
 Pasted in by hand; nothing here is published by the repo.
+Latest version (GitHub Pages): https://playdeezgames.github.io/wandermaze/
 
 ## Short description
 
 Collect the gold, grab the ice, and don't step on fire. Every square you leave behind turns to fire.
 
 ## Paste this as the page description
+
+Latest version: https://playdeezgames.github.io/wandermaze/
 
 The maze closes behind you.
 
@@ -23,7 +26,7 @@ Here is the catch: **every square you leave turns into fire**, so there is no go
 
 - Push target: `thegrumpygamedev/wandermaze:html`. `shippit.sh` wraps `tools/ship.sh`, which tests, builds with `-o:size` and zips; it only pushes with `--push`. That replaces the html channel's old TIC-80 export. The linux, windows and mac channels are the original TIC-80 builds and are not touched.
 - **AI disclosure, decided November 7, 2026:** the live page is tagged "No generative AI was used." The user decided to ship the Claude-written port to this page, disclosed (as for Chores of SPLORR!!): on ship day remove that tag and set the AI disclosure to Yes (Code), with the disclosure line above. Nothing here changes the page.
-- On the Edit game screen: "Kind of project" HTML, "This file will be played in the browser" ticked, and an embed of 680 by 460 (the game is 340 by 204 and scales to fit; the extra height is for the footer with credits and back links, November 12, 2026). Mobile friendly and the Fullscreen button ticked. On ship day also remove the linux, windows and mac uploads (the ports rule) and, once the GitHub Pages site is live, add "Latest version: https://playdeezgames.github.io/wandermaze/" near the top of the description.
+- On the Edit game screen: "Kind of project" HTML, "This file will be played in the browser" ticked, and an embed of 680 by 460 (the game is 340 by 204 and scales to fit; the extra height is for the footer with credits and back links, November 12, 2026). Mobile friendly and the Fullscreen button ticked. On ship day also remove the linux, windows and mac uploads (the ports rule) The GitHub Pages site went live November 12, 2026; the page copy above links it, and the same URL goes on the page as an external link.
 - The cover is `assets/cover.png` (630 by 500) and the screenshots are `assets/screenshots/`, both made by `tools/make_assets.sh` from the real renderer.
 - Sound effects are new in the port (the original is silent): six square-wave blips from the Anvil (`assets/wandermaze.world.json`, WAVs in `assets/sfx/`). Browsers keep audio locked until the first key or tap.
 - Known behaviour difference: the original hangs forever when the board fills up (level 15); the port keeps playing with a fuller board.

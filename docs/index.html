@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wandermaze</title>
+<style>
+	html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+	body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+	canvas {
+		image-rendering: pixelated;
+		width: min(100vw, calc((100vh - 3.5rem) * 340 / 204));
+		height: min(100vh - 3.5rem, calc(100vw * 204 / 340));
+		touch-action: none;
+	}
+	footer { padding: 6px 16px; text-align: center; font: 12px/1.4 sans-serif; color: #888; }
+	footer a { color: #bbb; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="340" height="204"></canvas>
+<footer>
+	Wandermaze by TheGrumpyGameDev. Port made with AI: code by Claude Code at the author's direction. Icons and text: Urizen by vurmux (CC0). Sound: the Anvil of SPLORR!!.<span class="ll-only" hidden> Feedback by LootLocker.</span><br>
+	<span class="ll-only" hidden><a href="#" id="feedback-link">Send feedback</a> · </span><a href="https://thegrumpygamedev.itch.io/" target="_blank" rel="noopener">itch.io</a> · <a href="https://playdeezgames.github.io/oeuvre-of-splorr/" target="_blank" rel="noopener">more games</a>
+</footer>
+<script src="odin.js"></script>
+<script src="lootlocker.js"></script>
+<script>
+// Feedback (the shared SPLORR!! LootLocker kit's form, splorr/Tech/LootLocker.md in the vault): reports go
+// to the LootLocker console under Feedback, Game. The link stays hidden until LL_KEY is filled in.
+// TODO before shipping with feedback: the LootLocker game's API domain and public Game API key (not a
+// secret), with Guest Login on, the CORS Allowlist (https://playdeezgames.github.io,
+// https://html-classic.itch.zone, http://localhost:8000) and Game feedback categories (Bug, Idea, Other).
+const LL_DOMAIN = "";
+const LL_KEY = "";
+const feedback = LL_KEY ? LootLocker({
+	domain: LL_DOMAIN,
+	key: LL_KEY,
+	version: "1.0.0",
+	idKey: "wandermaze:ll-player",
+}).feedbackDialog({ game: "Wandermaze" }) : null;
+if (feedback) {
+	document.querySelectorAll(".ll-only").forEach((el) => { el.hidden = false; });
+	document.getElementById("feedback-link").addEventListener("click", (e) => { e.preventDefault(); feedback.open(); });
+}
+</script>
+<script>
+(async function () {
+	const W = 340, H = 204;
+	const canvas = document.getElementById("screen");
+	const ctx = canvas.getContext("2d");
+	const memory = new odin.WasmMemoryInterface();
+	await odin.runWasm("game.wasm", null, {}, memory);
+	const ex = memory.exports;
+
+	if (location.search.includes("qa")) window.__wandermaze = ex; // QA only: ex.qa_clear_level()
+
+	const seed = crypto.getRandomValues(new Uint32Array(2));
+	ex.platform_init(seed[0], seed[1]);
+
+	// Sound effects from the Anvil, in game.Sound order (id 1 is the first file). The context is
+	// made now and decodes straight away; browsers keep it suspended until the first key or tap.
+	const SOUND_FILES = ["step", "ice", "shield", "coin", "level_up", "death"];
+	const SOUND_GAIN = [0.12, 0.25, 0.25, 0.25, 0.3, 0.3];
+	let audio = null, muted = false;
+	const buffers = [];
+	try {
+		audio = new (window.AudioContext || window.webkitAudioContext)();
+		SOUND_FILES.forEach((name, i) => {
+			fetch("sfx/" + name + ".wav")
+				.then((r) => r.arrayBuffer())
+				.then((data) => audio.decodeAudioData(data))
+				.then((buffer) => { buffers[i] = buffer; })
+				.catch(() => {});
+		});
+	} catch (e) { audio = null; }
+	function unlock() {
+		if (audio && audio.state === "suspended") audio.resume();
+	}
+	function play(id) {
+		const buffer = buffers[id - 1];
+		if (!audio || muted || !buffer) return;
+		const source = audio.createBufferSource();
+		const gain = audio.createGain();
+		source.buffer = buffer;
+		gain.gain.value = SOUND_GAIN[id - 1];
+		source.connect(gain).connect(audio.destination);
+		source.start();
+	}
+	function command(c) {
+		ex.platform_command(c);
+		const id = ex.platform_take_sound();
+		if (id) play(id);
+	}
+
+	// Matches platform_command in src/web/web.odin. The original uses the arrow keys and
+	// F2 (TIC-80 key 68) to restart; Enter, Space and R also restart here.
+	const KEYS = {
+		ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3,
+		F2: 4, Enter: 4, " ": 4, r: 4, R: 4,
+	};
+	window.addEventListener("keydown", (e) => {
+		if (e.key === "m" || e.key === "M") { muted = !muted; return; }
+		if (!(e.key in KEYS)) return;
+		e.preventDefault();
+		if (e.repeat) return; // the cart uses keyp() with no auto-repeat
+		unlock();
+		command(KEYS[e.key]);
+	});
+
+	// Touch: swipe on the canvas to move, tap to restart.
+	let touch = null;
+	canvas.addEventListener("pointerdown", (e) => { unlock(); touch = { x: e.clientX, y: e.clientY }; });
+	canvas.addEventListener("pointerup", (e) => {
+		if (!touch) return;
+		const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+		touch = null;
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { command(4); return; }
+		command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
+	});
+
+	const image = ctx.createImageData(W, H);
+	let last = performance.now();
+	function frame(now) {
+		const dt = Math.min((now - last) / 1000, 0.1); // seconds; capped after a hidden tab
+		last = now;
+		if (ex.platform_frame(dt)) {
+			// Read the buffer after the call: wasm memory may have grown.
+			image.data.set(new Uint8Array(memory.memory.buffer, ex.platform_frame_ptr(), W * H * 4));
+			ctx.putImageData(image, 0, 0);
+		}
+		requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
